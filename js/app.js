@@ -162,11 +162,15 @@
           h('a', { href: '#/transfer' }, 'نقل البيانات'),
           h('a', { href: '#/settings' }, 'الإعدادات')),
         h('div.topright',
-          App.btn('▦ قراءة باركود', () => Share.scan(), 'ghost small'),
+          App.btn([h('span', '▦'), h('span.txt', ' قراءة باركود')], () => Share.scan(), 'ghost small'),
           h('span#saveState.save-state.saved', 'محفوظ ✓'),
           h('span#storeLabel.store-label', ''),
-          App.btn('🔒 خروج', async () => { await App.flush(); Auth.lock(); }, 'ghost small'))),
-      h('main#view'));
+          App.btn([h('span', '🔒'), h('span.txt', ' خروج')], async () => { await App.flush(); Auth.lock(); }, 'ghost small'))),
+      h('main#view'),
+      // شريط سفلي للجوال (يظهر بالـ CSS على الشاشات الصغيرة فقط)
+      h('nav.bottomnav',
+        [['#/', '☰', 'القضايا'], ['#/new', '＋', 'جديدة'], ['#/transfer', '⇅', 'نقل'], ['#/settings', '⚙', 'الإعدادات']]
+          .map(([href, ic, t]) => h('a', { href }, h('i', ic), h('span', t)))));
   }
   const view = () => document.getElementById('view');
 
@@ -198,7 +202,7 @@
     App.flush();
     const parts = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
     const v = view(); v.innerHTML = ''; window.scrollTo(0, 0);
-    document.querySelectorAll('.topnav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + (parts[0] || '')));
+    document.querySelectorAll('.topnav a, .bottomnav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + (parts[0] || '')));
     App.current = null;
     try {
       if (!parts[0]) return renderDashboard(v);

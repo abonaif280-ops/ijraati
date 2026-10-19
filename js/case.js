@@ -7,8 +7,8 @@
   const pname = (p) => p ? `${p.rank ? p.rank + '/ ' : ''}${p.name}` : '';
 
   const TABS = [
-    ['info', 'البيانات'], ['parties', 'الأطراف'], ['events', 'الإجراءات'], ['docs', 'المحاضر والمستندات'],
-    ['attachments', 'المرفقات'], ['report', 'التقرير النهائي'], ['index', 'فهرس المعاملة'],
+    ['info', 'البيانات'], ['parties', 'الأطراف'], ['events', 'الإجراءات'], ['docs', 'المحاضر والمستندات', 'المحاضر'],
+    ['attachments', 'المرفقات'], ['report', 'التقرير النهائي', 'التقرير'], ['index', 'فهرس المعاملة', 'الفهرس'],
   ];
 
   function render(v, c, tab, sub) {
@@ -33,9 +33,13 @@
             c.deleted = true; App.touch(c); App.go('#/');
           }, 'ghost small danger'))),
       tracker,
-      h('nav.tabs', TABS.map(([k, t]) => h('a' + (k === tab || (tab === 'doc' && k === 'docs') ? '.active' : ''), { href: `#/case/${c.id}/${k}` }, t,
+      h('nav.tabs', TABS.map(([k, t, short]) => h('a' + (k === tab || (tab === 'doc' && k === 'docs') ? '.active' : ''), { href: `#/case/${c.id}/${k}` },
+        short ? [h('span.t-long', t), h('span.t-short', short)] : t,
         k === 'parties' ? badge(live(c.parties).length) : k === 'events' ? badge(live(c.events).length) : k === 'docs' ? badge(live(c.docs).length) : k === 'attachments' ? badge(live(c.attachments).length) : null))));
 
+    // في الجوال: إظهار التبويب الحالي داخل شريط التبويبات المتحرك أفقياً
+    const act = v.querySelector('.tabs a.active');
+    if (act) requestAnimationFrame(() => act.scrollIntoView({ block: 'nearest', inline: 'center' }));
     const body = h('div.tab-body'); v.append(body);
     ({ info: tabInfo, parties: tabParties, events: tabEvents, docs: tabDocs, attachments: tabAttachments, report: tabReport, index: tabIndex, doc: docEditor }[tab] || tabInfo)(body, c, sub);
   }
