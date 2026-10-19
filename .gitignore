@@ -1,0 +1,21 @@
+# قائمة سماح: يُستبعد كل شيء ما عدا ملفات الواجهة، حتى لا تُرفع أي بيانات أو إعدادات أو ملفات اختبار
+/*
+!/.gitignore
+!/index.html
+!/manifest.webmanifest
+!/sw.js
+!/css/
+!/js/
+!/icons/
+
+# احتياط إضافي
+اختبار_الجهاز.html
+.claude/
+القضايا/
+الإعدادات.json
+*.tahqiq.json
+*.json
+!/manifest.webmanifest
+
+# بيانات الجهة على الكمبيوتر فقط
+/js/local.js
