@@ -1,5 +1,5 @@
 /* يخزّن ملفات الواجهة فقط ليعمل البرنامج بدون إنترنت. لا يمرّ عبره أي بيانات قضايا (تُحفظ في IndexedDB). */
-const CACHE = 'tahqiq-v4';
+const CACHE = 'tahqiq-v5';
 const FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/lib/qrcode.js', 'js/lib/jsQR.js', 'js/util.js', 'js/store.js', 'js/doc.js',
