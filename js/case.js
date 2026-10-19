@@ -53,7 +53,7 @@
       c.subject ? `الموضوع: ${c.subject}` : '',
       c.referringBody ? `الجهة المحيلة: ${c.referringBody}` : '',
       c.order && c.order.no ? `أمر التحقيق: ${c.order.no} وتاريخ ${c.order.dateH || ''}هـ` : '',
-      live(c.parties).length ? 'الأطراف:\n' + live(c.parties).map((p) => `- ${T.ROLES[p.role]}: ${pname(p)}`).join('\n') : '',
+      live(c.parties).length ? 'الأطراف:\n' + live(c.parties).map((p) => `- ${T.roleLabel(p)}: ${pname(p)}`).join('\n') : '',
       `المرحلة الحالية: ${inf.current} (${inf.percent}%)`,
       last ? `آخر إجراء: ${last.type} بتاريخ ${U.hijri(last.date)}هـ` : '',
       c.followNext ? `الإجراء القادم: ${c.followNext}` : '',
@@ -99,19 +99,25 @@
     const draw = () => {
       list.innerHTML = '';
       const ps = live(c.parties);
-      if (!ps.length) list.append(h('div.empty', 'أضف المحقق معهم والشهود. بياناتهم تُعبّأ تلقائياً في المحاضر والخطابات.'));
+      if (!ps.length) list.append(h('div.empty', 'أضف أطراف القضية (محقق معه، مدعي، مدعى عليه، شاهد...). بياناتهم تُعبّأ تلقائياً في المحاضر والخطابات. يمكنك إضافة صفات أخرى من «الإعدادات».'));
       ps.forEach((p) => {
-        const actions = p.role === 'accused'
-          ? [['محضر سماع أقوال', 'statement'], ['إقرار إحاطة', 'ackCharge'], ['خطاب مراجعة', 'letterSummon']]
-          : [['محضر سماع شاهد', 'witness'], ['إقرار', 'ackFree']];
+        const kind = T.roleKind(p);
+        const actions = {
+          accused: [['محضر سماع أقوال', 'statement'], ['إقرار إحاطة', 'ackCharge'], ['خطاب مراجعة', 'letterSummon']],
+          party: [['محضر سماع أقوال', 'hearing'], ['إقرار', 'ackFree'], ['خطاب مراجعة', 'letterSummon']],
+          witness: [['محضر سماع شاهد', 'witness'], ['إقرار', 'ackFree']],
+        }[kind];
+        // صفة محذوفة من الإعدادات تبقى ظاهرة في قائمة هذا الطرف حتى لا تضيع
+        const roleOpts = T.roles().map((r) => [r.id, r.label]);
+        if (!T.roles().some((r) => r.id === p.role)) roleOpts.push([p.role, T.roleLabel(p)]);
         list.append(h('section.card.party',
           h('div.party-head',
-            h('span.role.' + p.role, T.ROLES[p.role]),
+            h('span.role.' + kind, T.roleLabel(p)),
             h('b', pname(p) || 'طرف جديد'),
             h('div.row.wrap', actions.map(([t, type]) => App.btn(t, () => createDoc(c, type, [p.id]), 'small secondary')),
               App.btn('حذف', async () => { if (await U.confirm(`حذف ${p.name || 'الطرف'}؟`)) { p.deleted = true; p.updatedAt = U.now(); App.touch(c); draw(); } }, 'small ghost danger'))),
           h('div.grid3',
-            F('الصفة', p, 'role', { type: 'select', options: Object.entries(T.ROLES), onChange: draw }),
+            F('الصفة', p, 'role', { type: 'select', options: roleOpts, onChange: () => { p.roleLabel = T.roleLabel(p); draw(); } }),
             F('الاسم الرباعي', p, 'name'),
             F('الرتبة / الصفة الوظيفية', p, 'rank'),
             F('الرقم العسكري', p, 'militaryNo', { dir: 'ltr' }),
@@ -123,8 +129,8 @@
           F('مختصر الأقوال (يُستخدم في التقرير إذا لم يوجد محضر)', p, 'summary', { type: 'textarea', rows: 2, full: true })));
       });
     };
-    const add = (role) => { c.parties.push({ id: U.uid(), role, name: '', rank: '', unit: '', updatedAt: U.now() }); App.touch(c); draw(); list.lastChild.scrollIntoView({ behavior: 'smooth' }); };
-    b.append(h('div.row.wrap.tab-actions', App.btn('+ محقق معه', () => add('accused')), App.btn('+ شاهد', () => add('witness'), 'secondary')), list);
+    const add = (r) => { c.parties.push({ id: U.uid(), role: r.id, roleLabel: r.label, name: '', rank: '', unit: '', updatedAt: U.now() }); App.touch(c); draw(); list.lastChild.scrollIntoView({ behavior: 'smooth' }); };
+    b.append(h('div.row.wrap.tab-actions', T.roles().map((r, i) => App.btn('+ ' + r.label, () => add(r), i ? 'secondary' : ''))), list);
     draw();
   }
 
@@ -199,7 +205,8 @@
   // ================= المستندات =================
   function createDoc(c, type, partyIds) {
     const Tp = T.DOC_TYPES[type];
-    const candidates = live(c.parties).filter((p) => Tp.parties === 'one-accused' ? p.role === 'accused' : Tp.parties === 'one-witness' ? p.role === 'witness' : true);
+    const kind = { 'one-accused': 'accused', 'one-party': 'party', 'one-witness': 'witness' }[Tp.parties];
+    const candidates = live(c.parties).filter((p) => !kind || T.roleKind(p) === kind);
     const make = (ids) => {
       const d = T.newDoc(type, c, App.S, ids);
       c.docs.push(d); App.touch(c);
@@ -210,10 +217,10 @@
       const pool = candidates.length ? candidates : live(c.parties);
       if (!pool.length) { U.toast('أضف الطرف أولاً من تبويب «الأطراف»', 'err'); return App.go(`#/case/${c.id}/parties`); }
       if (pool.length === 1) return make([pool[0].id]);
-      const m = U.modal('اختر الطرف', h('div.pick-list', pool.map((p) => App.btn(`${T.ROLES[p.role]}: ${pname(p)}`, () => { m.close(); make([p.id]); }, 'secondary'))));
+      const m = U.modal('اختر الطرف', h('div.pick-list', pool.map((p) => App.btn(`${T.roleLabel(p)}: ${pname(p)}`, () => { m.close(); make([p.id]); }, 'secondary'))));
       return;
     }
-    if (Tp.parties === 'many') return make(live(c.parties).filter((p) => p.role === 'accused').map((p) => p.id));
+    if (Tp.parties === 'many') return make(live(c.parties).filter(T.isAccused).map((p) => p.id));
     make([]);
   }
 
@@ -300,7 +307,7 @@
       const pool = live(c.parties);
       if (Tp.parties.startsWith('one')) {
         partyCtl = h('label.field', h('span.lbl', 'الطرف'), h('span.ctl', (() => {
-          const sel = h('select', h('option', { value: '' }, '—'), pool.map((p) => h('option', { value: p.id }, `${T.ROLES[p.role]}: ${pname(p)}`)));
+          const sel = h('select', h('option', { value: '' }, '—'), pool.map((p) => h('option', { value: p.id }, `${T.roleLabel(p)}: ${pname(p)}`)));
           sel.value = (d.partyIds || [])[0] || '';
           sel.addEventListener('change', () => { d.partyIds = sel.value ? [sel.value] : []; regen(false); });
           return sel;
@@ -458,9 +465,9 @@
     const FR = (l, k, o = {}) => F(l, r, k, o);
 
     const sums = live(c.parties).map((p) => {
-      const f = F(`ملخص أقوال ${T.ROLES[p.role]}: ${pname(p)}`, r.summaries, p.id, { type: 'textarea', rows: 4, full: true, item: false, onChange: () => { r.updatedAt = U.now(); } });
+      const f = F(`ملخص أقوال ${T.roleLabel(p)}: ${pname(p)}`, r.summaries, p.id, { type: 'textarea', rows: 4, full: true, item: false, onChange: () => { r.updatedAt = U.now(); } });
       const fromRecords = App.btn('توليد من المحاضر', () => {
-        const recs = live(c.docs).filter((d) => (d.type === 'statement' || d.type === 'witness' || d.type === 'confrontation') && (d.partyIds || []).includes(p.id));
+        const recs = live(c.docs).filter((d) => ['statement', 'hearing', 'witness', 'confrontation'].includes(d.type) && (d.partyIds || []).includes(p.id));
         if (!recs.length) return U.toast('لا توجد محاضر لهذا الطرف', 'err');
         const text = recs.map((d) => (d.qa || []).filter((x) => x.a && (!x.who || x.who === pname(p))).map((x) => x.a.trim()).join(' ')).join('\n');
         r.summaries[p.id] = text; f.querySelector('textarea').value = text; r.updatedAt = U.now(); App.touch(c); refresh();

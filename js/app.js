@@ -99,12 +99,19 @@
 
   function mergeSettings(saved) {
     const D = JSON.parse(JSON.stringify(T.DEFAULT_SETTINGS));
-    if (!saved) return D;
-    const S = Object.assign(D, saved);
-    S.texts = Object.assign(JSON.parse(JSON.stringify(T.DEFAULT_SETTINGS.texts)), saved.texts || {});
-    S.leftLabels = Object.assign({}, T.DEFAULT_SETTINGS.leftLabels, saved.leftLabels || {});
-    S.investigator = Object.assign({}, T.DEFAULT_SETTINGS.investigator, saved.investigator || {});
-    S.chief = Object.assign({}, T.DEFAULT_SETTINGS.chief, saved.chief || {});
+    const S = saved ? Object.assign(D, saved) : D;
+    if (saved) {
+      S.texts = Object.assign(JSON.parse(JSON.stringify(T.DEFAULT_SETTINGS.texts)), saved.texts || {});
+      S.leftLabels = Object.assign({}, T.DEFAULT_SETTINGS.leftLabels, saved.leftLabels || {});
+      S.investigator = Object.assign({}, T.DEFAULT_SETTINGS.investigator, saved.investigator || {});
+      S.chief = Object.assign({}, T.DEFAULT_SETTINGS.chief, saved.chief || {});
+    }
+    // «محقق معه» و«شاهد» أساسيتان لأن القضايا القديمة تعتمد عليهما
+    S.roles = Array.isArray(S.roles) && S.roles.length ? S.roles : D.roles;
+    for (const id of ['witness', 'accused']) {
+      if (!S.roles.some((r) => r.id === id)) S.roles.unshift(JSON.parse(JSON.stringify(T.DEFAULT_SETTINGS.roles.find((r) => r.id === id))));
+    }
+    T.setRoles(S.roles);
     return S;
   }
 
@@ -272,7 +279,7 @@
       }
       rows.forEach((c) => {
         const inf = infos.get(c) || T.stageInfo(c, S);
-        const names = App.live(c.parties).filter((p) => p.role === 'accused').map((p) => p.name).join('، ');
+        const names = App.live(c.parties).filter(T.isAccused).map((p) => p.name).join('، ');
         const card = h('a.case-card', { href: '#/case/' + c.id + '/info' },
           h('div.cc-top', h('b.cc-no', c.caseNo || '(بدون رقم)'),
             h('span.flag.' + flagClass(inf.flag), inf.flag),
@@ -354,7 +361,8 @@
 
     // الصياغات
     const textLabels = {
-      statementIntro: 'محضر سماع الأقوال: الافتتاحية', statementCharge: 'محضر سماع الأقوال: الإحاطة بالمخالفة', statementClose: 'محضر سماع الأقوال: الخاتمة',
+      statementIntro: 'محضر سماع الأقوال: الافتتاحية', statementCharge: 'محضر سماع الأقوال: الإحاطة بالمخالفة', statementClose: 'محضر سماع الأقوال: الخاتمة (وخاتمة محضر الطرف)',
+      hearingIntro: 'محضر سماع أقوال طرف (مدعي ونحوه): الافتتاحية',
       witnessIntro: 'محضر الشاهد: الافتتاحية', witnessCharge: 'محضر الشاهد: التنبيه', witnessClose: 'محضر الشاهد: الخاتمة',
       confrontationIntro: 'محضر المواجهة: الافتتاحية', confrontationClose: 'محضر المواجهة: الخاتمة',
       generalRecord: 'المحضر العام', closingRecord: 'محضر إقفال التحقيق',
@@ -378,6 +386,28 @@
       bank.append(App.btn('+ سؤال', () => { S.questionBank.push({ cat: 'الموضوع', q: '' }); App.saveSettingsSoon(); drawBank(); }, 'small secondary'));
     };
     drawBank();
+
+    // صفات الأطراف
+    const rolesBox = h('div.roles');
+    const rolesChanged = () => { T.setRoles(S.roles); App.saveSettingsSoon(); };
+    const drawRoles = () => {
+      rolesBox.innerHTML = '';
+      S.roles.forEach((r, i) => {
+        const kind = h('select', T.ROLE_KINDS.map(([v, t]) => h('option', { value: v }, t)));
+        kind.value = r.kind;
+        kind.addEventListener('change', () => { r.kind = kind.value; rolesChanged(); });
+        const base = r.id === 'accused' || r.id === 'witness';
+        rolesBox.append(h('div.line-row.role-row',
+          h('input', { value: r.label, placeholder: 'اسم الصفة', on: { input: (e) => { r.label = e.target.value; rolesChanged(); } } }),
+          kind,
+          base ? h('span.icon-spacer') : App.btn('✕', async () => {
+            if (!(await U.confirm(`حذف الصفة «${r.label}»؟ الأطراف المسجلون بها يبقون بنفس الاسم.`))) return;
+            S.roles.splice(i, 1); rolesChanged(); drawRoles();
+          }, 'icon danger')));
+      });
+      rolesBox.append(App.btn('+ صفة', () => { S.roles.push({ id: 'r' + U.uid(), label: '', kind: 'party' }); rolesChanged(); drawRoles(); rolesBox.querySelector('.role-row:last-of-type input').focus(); }, 'small secondary'));
+    };
+    drawRoles();
 
     // الأرقام
     const contacts = h('div.contacts');
@@ -420,6 +450,9 @@
       sec('صياغات المستندات',
         h('p.note', 'المتغيرات بين القوسين { } تُستبدل تلقائياً ببيانات القضية. اضغط على أي متغير لنسخه:'), chips, texts),
       sec('بنك الأسئلة', h('p.note', 'تظهر هذه الأسئلة عند كتابة المحاضر لتختار منها بسرعة.'), bank),
+      sec('صفات الأطراف',
+        h('p.note', 'تظهر هذه الصفات عند إضافة طرف في القضية. «النوع» يحدد المحضر المناسب: من يُحاط بالمخالفة يُفتح له محضر سماع أقوال مع الإحاطة ويُعد من المحقق معهم في الخطابات والتقرير، والطرف بدون إحاطة (كالمدعي) له محضر سماع أقوال بدون إحاطة، والشاهد له محضر الشاهد.'),
+        rolesBox),
       Auth.settingsSection(),
       sec('أرقام الإرسال (واتساب / رسائل)', contacts),
       sec('التخزين',

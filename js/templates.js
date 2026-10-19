@@ -23,7 +23,8 @@
       statementIntro: 'إنه في يوم {اليوم} الموافق {التاريخ}هـ، وفي تمام الساعة {الساعة}، وبمقر {المكان}، وبناءً على خطاب {صاحب_الإحالة} رقم ({رقم_خطاب_الإحالة}) وتاريخ {تاريخ_خطاب_الإحالة}هـ، بشأن {الموضوع}، وبناءً على أمر التحقيق رقم ({رقم_أمر_التحقيق}) وتاريخ {تاريخ_أمر_التحقيق}هـ، فقد افتتحنا نحن {رتبة_المحقق}/ {المحقق} هذا المحضر، وحضر أمامنا المذكور بياناته أدناه:',
       statementCharge: 'وبإحاطته بما هو منسوب إليه وهو: {المخالفة}، وإفهامه بحقه في إبداء أقواله ودفاعه وتقديم ما لديه من مستندات، جرى سؤاله على النحو الآتي:',
       statementClose: 'وبهذا انتهت أقواله، وأُقفل المحضر في تمام الساعة {ساعة_الانتهاء}، وبعد تلاوة أقواله عليه أقرّ بصحتها ووقّع عليها، والله الموفق.',
-      witnessIntro: 'إنه في يوم {اليوم} الموافق {التاريخ}هـ، وفي تمام الساعة {الساعة}، وبمقر {المكان}، وإلحاقاً بالتحقيق الجاري في القضية رقم ({رقم_المعاملة}) بشأن {الموضوع}، وبناءً على أمر التحقيق رقم ({رقم_أمر_التحقيق}) وتاريخ {تاريخ_أمر_التحقيق}هـ، حضر أمامنا نحن {رتبة_المحقق}/ {المحقق} الشاهد المذكور بياناته أدناه:',
+      hearingIntro: 'إنه في يوم {اليوم} الموافق {التاريخ}هـ، وفي تمام الساعة {الساعة}، وبمقر {المكان}، وإلحاقاً بالتحقيق الجاري في القضية رقم ({رقم_المعاملة}) بشأن {الموضوع}، وبناءً على أمر التحقيق رقم ({رقم_أمر_التحقيق}) وتاريخ {تاريخ_أمر_التحقيق}هـ، حضر أمامنا نحن {رتبة_المحقق}/ {المحقق} المذكور بياناته أدناه بصفته ({الصفة})، وجرى سؤاله على النحو الآتي:',
+      witnessIntro:'إنه في يوم {اليوم} الموافق {التاريخ}هـ، وفي تمام الساعة {الساعة}، وبمقر {المكان}، وإلحاقاً بالتحقيق الجاري في القضية رقم ({رقم_المعاملة}) بشأن {الموضوع}، وبناءً على أمر التحقيق رقم ({رقم_أمر_التحقيق}) وتاريخ {تاريخ_أمر_التحقيق}هـ، حضر أمامنا نحن {رتبة_المحقق}/ {المحقق} الشاهد المذكور بياناته أدناه:',
       witnessCharge: 'وبعد تنبيهه إلى وجوب قول الحق وعدم كتمان الشهادة، جرى سؤاله على النحو الآتي:',
       witnessClose: 'وبهذا انتهت أقواله، وأُقفل المحضر في تمام الساعة {ساعة_الانتهاء}، وبعد تلاوة أقواله عليه أقرّ بصحتها ووقّع عليها، والله الموفق.',
       confrontationIntro: 'إنه في يوم {اليوم} الموافق {التاريخ}هـ، وفي تمام الساعة {الساعة}، وبمقر {المكان}، وإلحاقاً بالتحقيق الجاري في القضية رقم ({رقم_المعاملة}) بشأن {الموضوع}، ولوجود تعارض في الأقوال بين كل من: {الأطراف}، فقد أجرينا نحن {رتبة_المحقق}/ {المحقق} المواجهة بينهم على النحو الآتي:',
@@ -73,12 +74,32 @@
   const PRIORITIES = ['عالية', 'متوسطة', 'منخفضة'];
   const STATUSES = ['قيد العمل', 'بانتظار رد/إجراء', 'موقوفة مؤقتاً', 'مكتملة'];
   const REFERRAL_TYPES = ['داخلية', 'خارجية'];
-  const ROLES = { accused: 'محقق معه', witness: 'شاهد' };
+  // صفات الأطراف: تُعدّل من الإعدادات. «النوع» يحدد المحضر المناسب وهل يُحاط الطرف بالمخالفة
+  const ROLE_KINDS = [
+    ['accused', 'يُحاط بالمخالفة'],
+    ['party', 'طرف بدون إحاطة'],
+    ['witness', 'شاهد'],
+  ];
+  const DEFAULT_ROLES = [
+    { id: 'accused', label: 'محقق معه', kind: 'accused' },
+    { id: 'defendant', label: 'مدعى عليه', kind: 'accused' },
+    { id: 'plaintiff', label: 'مدعي', kind: 'party' },
+    { id: 'witness', label: 'شاهد', kind: 'witness' },
+  ];
+  DEFAULT_SETTINGS.roles = DEFAULT_ROLES;
+  let roles = DEFAULT_ROLES;
+  const setRoles = (list) => { roles = list && list.length ? list : DEFAULT_ROLES; };
+  const findRole = (id) => roles.find((r) => r.id === id);
+  /** اسم صفة الطرف؛ إن حُذفت الصفة من الإعدادات يُعرض آخر اسم حُفظ معه */
+  const roleLabel = (p) => ((findRole(p.role) || {}).label || p.roleLabel || 'طرف');
+  const roleKind = (p) => ((findRole(p.role) || {}).kind || (p.role === 'accused' ? 'accused' : 'witness'));
+  const isAccused = (p) => roleKind(p) === 'accused';
 
   // ================= أنواع المستندات =================
   // parties: none | one-accused | one-witness | one | many
   const DOC_TYPES = {
     statement:     { group: 'محاضر', name: 'محضر سماع أقوال محقق معه', short: 'محضر سماع أقوال', parties: 'one-accused', qa: true, intro: 'statementIntro', mid: 'statementCharge', close: 'statementClose', event: 'إجراء التحقيق', signParties: true },
+    hearing:       { group: 'محاضر', name: 'محضر سماع أقوال طرف (مدعي ونحوه)', short: 'محضر سماع أقوال', parties: 'one-party', qa: true, intro: 'hearingIntro', close: 'statementClose', event: 'إجراء التحقيق', signParties: true },
     witness:       { group: 'محاضر', name: 'محضر سماع أقوال شاهد', short: 'محضر سماع أقوال شاهد', parties: 'one-witness', qa: true, intro: 'witnessIntro', mid: 'witnessCharge', close: 'witnessClose', event: 'إجراء التحقيق', signParties: true },
     confrontation: { group: 'محاضر', name: 'محضر مواجهة', short: 'محضر مواجهة', parties: 'many', qa: true, intro: 'confrontationIntro', close: 'confrontationClose', event: 'إجراء التحقيق', signParties: true },
     general:       { group: 'محاضر', name: 'محضر عام (اطلاع / معاينة / إثبات حالة)', short: 'محضر', parties: 'many-optional', intro: 'generalRecord', event: 'إجراء التحقيق', signParties: true, freeTitle: true },
@@ -105,7 +126,7 @@
   function vars(c, S, d) {
     const parties = (d && d.partyIds ? d.partyIds.map((id) => c.parties.find((p) => p.id === id)).filter(Boolean) : []);
     const p = parties[0] || {};
-    const accused = c.parties.filter((x) => x.role === 'accused');
+    const accused = c.parties.filter((x) => !x.deleted && isAccused(x));
     const date = (d && d.date) || U.todayISO();
     return {
       'رقم_المعاملة': c.caseNo,
@@ -119,6 +140,7 @@
       'رقم_أمر_التحقيق': c.order && c.order.no,
       'تاريخ_أمر_التحقيق': c.order && c.order.dateH,
       'مصدر_الأمر': c.order && c.order.issuer,
+      'الصفة': p.id ? roleLabel(p) : '',
       'الاسم': p.name, 'الرتبة': p.rank, 'الرقم_العسكري': p.militaryNo, 'الهوية': p.nationalId,
       'جهة_العمل': p.unit, 'الجوال': p.phone,
       'الأطراف': partyNames(parties.length ? parties : accused),
@@ -133,7 +155,7 @@
   }
 
   const VAR_HELP = ['رقم_المعاملة', 'الموضوع', 'المخالفة', 'الجهة_المحيلة', 'صاحب_الإحالة', 'رقم_خطاب_الإحالة', 'تاريخ_خطاب_الإحالة',
-    'رقم_أمر_التحقيق', 'تاريخ_أمر_التحقيق', 'مصدر_الأمر', 'الاسم', 'الرتبة', 'الرقم_العسكري', 'الهوية', 'جهة_العمل', 'الجوال',
+    'رقم_أمر_التحقيق', 'تاريخ_أمر_التحقيق', 'مصدر_الأمر', 'الصفة', 'الاسم', 'الرتبة', 'الرقم_العسكري', 'الهوية', 'جهة_العمل', 'الجوال',
     'الأطراف', 'قائمة_المحقق_معهم', 'المحقق', 'رتبة_المحقق', 'رئيس_الشعبة', 'الشعبة', 'المكان', 'المخاطب',
     'اليوم', 'التاريخ', 'الساعة', 'ساعة_الانتهاء', 'تاريخ_اليوم'];
 
@@ -171,7 +193,7 @@
   const sigLine = 'التوقيع: ..................';
   const officerSig = (S) => ({ title: S.investigator.title || 'المحقق', lines: [`${S.investigator.rank ? S.investigator.rank + '/ ' : ''}${S.investigator.name || '..................'}`, sigLine] });
   const chiefSig = (S) => ({ title: S.chief.title || 'رئيس الشعبة', lines: [`${S.chief.rank ? S.chief.rank + '/ ' : ''}${S.chief.name || '..................'}`, sigLine] });
-  const partySig = (p, label) => ({ title: label || ROLES[p.role] || 'الطرف', lines: [`${p.rank ? p.rank + '/ ' : ''}${p.name}`, sigLine] });
+  const partySig = (p, label) => ({ title: label || roleLabel(p), lines: [`${p.rank ? p.rank + '/ ' : ''}${p.name}`, sigLine] });
 
   // ================= بناء نموذج المستند =================
   function build(c, d, S) {
@@ -228,7 +250,7 @@
     const v = vars(c, S, null);
     const summaries = {};
     c.parties.forEach((p) => {
-      const recs = (c.docs || []).filter((d) => (d.type === 'statement' || d.type === 'witness') && (d.partyIds || []).includes(p.id));
+      const recs = (c.docs || []).filter((d) => !d.deleted && ['statement', 'hearing', 'witness'].includes(d.type) && (d.partyIds || []).includes(p.id));
       summaries[p.id] = recs.length ? recs.map((d) => (d.qa || []).filter((x) => x.a).map((x) => x.a).join(' ')).join('\n') : (p.summary || '');
     });
     return {
@@ -259,7 +281,7 @@
 
     sec('الوقائع'); paras(r.facts);
 
-    const accused = c.parties.filter((p) => p.role === 'accused');
+    const accused = c.parties.filter((p) => !p.deleted && isAccused(p));
     if (r.showBio && accused.length) {
       sec('النبذة الوظيفية للمحقق معهم');
       B.push({ t: 'table', head: ['م', 'الاسم', 'الرتبة', 'الرقم العسكري', 'جهة العمل', 'السوابق'], widths: [0.05, 0.25, 0.12, 0.18, 0.24, 0.16],
@@ -276,7 +298,7 @@
     if (withSum.length) {
       sec('ملخص الأقوال');
       withSum.forEach((p) => {
-        B.push({ t: 'p', text: `**${ROLES[p.role]}: ${p.rank ? p.rank + '/ ' : ''}${p.name}**` });
+        B.push({ t: 'p', text: `**${roleLabel(p)}:${p.rank ? p.rank + '/ ' : ''}${p.name}**` });
         paras(r.summaries[p.id]);
       });
     }
@@ -342,7 +364,8 @@
   }
 
   global.T = {
-    DEFAULT_SETTINGS, STAGES, EVENT_TYPES, PRIORITIES, STATUSES, REFERRAL_TYPES, ROLES, DOC_TYPES, VAR_HELP,
+    DEFAULT_SETTINGS, STAGES, EVENT_TYPES, PRIORITIES, STATUSES, REFERRAL_TYPES, ROLE_KINDS, DOC_TYPES, VAR_HELP,
+    setRoles, roles: () => roles.filter((r) => (r.label || '').trim()), roleLabel, roleKind, isAccused,
     vars, newDoc, fillTexts, build, defaultReport, buildReport, defaultIndex, buildIndex, stageInfo, eventsSorted,
   };
 })(window);
